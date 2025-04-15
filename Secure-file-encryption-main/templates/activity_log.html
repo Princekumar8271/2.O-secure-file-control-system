@@ -1,0 +1,190 @@
+{% extends "base.html" %}
+
+{% block title %}Activity Log - Secure File Manager{% endblock %}
+
+{% block content %}
+<div class="max-w-7xl mx-auto px-4 py-8">
+    <h2 class="text-center text-3xl font-bold mb-8 bg-gradient-to-r from-blue-500 to-purple-500 bg-clip-text text-transparent drop-shadow-[0_0_8px_rgba(59,130,246,0.4)]">Activity Log</h2>
+    
+    <div class="glass-card blue-glow backdrop-blur-xl p-8 rounded-xl border border-blue-500/20 shadow-[0_8px_32px_rgba(0,0,0,0.3)] transition-all duration-300">
+        <!-- Filters -->
+        <div class="mb-8 grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="filter-group">
+                <label class="block text-gray-300 mb-2">Action Type</label>
+                <select id="action-filter" class="w-full bg-gray-800/60 border border-gray-700/50 rounded-lg px-3 py-2 text-white">
+                    <option value="all">All Actions</option>
+                    <option value="login">Login</option>
+                    <option value="file">File Operations</option>
+                    <option value="security">Security Events</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label class="block text-gray-300 mb-2">Time Range</label>
+                <select id="time-filter" class="w-full bg-gray-800/60 border border-gray-700/50 rounded-lg px-3 py-2 text-white">
+                    <option value="all">All Time</option>
+                    <option value="today">Today</option>
+                    <option value="week">This Week</option>
+                    <option value="month">This Month</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label class="block text-gray-300 mb-2">Status</label>
+                <select id="status-filter" class="w-full bg-gray-800/60 border border-gray-700/50 rounded-lg px-3 py-2 text-white">
+                    <option value="all">All Status</option>
+                    <option value="success">Success</option>
+                    <option value="error">Error</option>
+                    <option value="warning">Warning</option>
+                </select>
+            </div>
+        </div>
+        
+        <!-- Activity Table -->
+        <div class="overflow-x-auto">
+            <table class="min-w-full glass-inner rounded-lg overflow-hidden">
+                <thead>
+                    <tr class="bg-gray-800/70 text-left">
+                        <th class="px-6 py-3 text-white font-semibold">Action</th>
+                        <th class="px-6 py-3 text-white font-semibold">Timestamp</th>
+                        <th class="px-6 py-3 text-white font-semibold">Status</th>
+                        <th class="px-6 py-3 text-white font-semibold">Details</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% if activities %}
+                        {% for activity in activities %}
+                        <tr class="border-t border-gray-800/50 hover:bg-gray-800/50 transition-colors" data-action="{{ activity.action }}" data-status="{{ activity.status }}">
+                            <td class="px-6 py-4 text-white">
+                                <div class="flex items-center">
+                                    {% if 'login' in activity.action %}
+                                    <i class="fas fa-sign-in-alt text-blue-400 mr-2"></i>
+                                    {% elif 'file' in activity.action or 'decrypt' in activity.action or 'encrypt' in activity.action %}
+                                    <i class="fas fa-file-alt text-green-400 mr-2"></i>
+                                    {% elif 'face' in activity.action %}
+                                    <i class="fas fa-user-shield text-purple-400 mr-2"></i>
+                                    {% elif 'password' in activity.action %}
+                                    <i class="fas fa-key text-yellow-400 mr-2"></i>
+                                    {% else %}
+                                    <i class="fas fa-info-circle text-gray-400 mr-2"></i>
+                                    {% endif %}
+                                    {{ activity.action|replace('_', ' ')|title }}
+                                </div>
+                            </td>
+                            <td class="px-6 py-4 text-white">{{ activity.timestamp }}</td>
+                            <td class="px-6 py-4">
+                                <span class="px-2 py-1 rounded-full text-xs font-semibold
+                                    {% if activity.status == 'success' %}bg-green-900/60 text-green-400
+                                    {% elif activity.status == 'error' %}bg-red-900/60 text-red-400
+                                    {% elif activity.status == 'warning' %}bg-yellow-900/60 text-yellow-400
+                                    {% else %}bg-gray-900/60 text-gray-400{% endif %}">
+                                    {{ activity.status|title }}
+                                </span>
+                            </td>
+                            <td class="px-6 py-4 text-white">
+                                <button class="view-details px-3 py-1 bg-blue-600/40 hover:bg-blue-600/60 rounded-md text-sm text-blue-300 transition-colors duration-300" 
+                                        data-details="{{ activity.details|tojson }}" 
+                                        data-resource="{{ activity.resource_id or 'N/A' }}">
+                                    View Details
+                                </button>
+                            </td>
+                        </tr>
+                        {% endfor %}
+                    {% else %}
+                        <tr>
+                            <td colspan="4" class="px-6 py-8 text-center text-gray-300">
+                                <i class="fas fa-info-circle mr-2"></i> No activity logs found
+                            </td>
+                        </tr>
+                    {% endif %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+
+<!-- Modal for viewing details -->
+<div id="details-modal" class="fixed inset-0 flex items-center justify-center z-50 hidden">
+    <div class="modal-backdrop fixed inset-0 bg-black/70 backdrop-blur-sm"></div>
+    <div class="modal-content glass-card blue-glow backdrop-blur-xl p-6 rounded-xl border border-blue-500/20 shadow-[0_8px_32px_rgba(0,0,0,0.3)] max-w-2xl w-full mx-4 z-10">
+        <div class="flex justify-between items-center mb-4">
+            <h3 class="text-xl font-semibold text-white">Activity Details</h3>
+            <button id="close-modal" class="text-gray-300 hover:text-white">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+        <div class="modal-body">
+            <div class="grid grid-cols-1 gap-4">
+                <div class="glass-inner p-4 rounded-lg">
+                    <h4 class="text-gray-300 text-sm mb-1">Resource ID</h4>
+                    <p id="resource-id" class="text-white"></p>
+                </div>
+                <div class="glass-inner p-4 rounded-lg">
+                    <h4 class="text-gray-300 text-sm mb-1">Additional Data</h4>
+                    <pre id="details-content" class="text-white text-sm overflow-x-auto whitespace-pre-wrap"></pre>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    // Filter functionality
+    const actionFilter = document.getElementById('action-filter');
+    const timeFilter = document.getElementById('time-filter');
+    const statusFilter = document.getElementById('status-filter');
+    const rows = document.querySelectorAll('tbody tr');
+    
+    function applyFilters() {
+        const actionValue = actionFilter.value;
+        const statusValue = statusFilter.value;
+        
+        rows.forEach(row => {
+            const action = row.getAttribute('data-action');
+            const status = row.getAttribute('data-status');
+            let show = true;
+            
+            if (actionValue !== 'all' && !action.includes(actionValue)) {
+                show = false;
+            }
+            
+            if (statusValue !== 'all' && status !== statusValue) {
+                show = false;
+            }
+            
+            row.style.display = show ? '' : 'none';
+        });
+    }
+    
+    actionFilter.addEventListener('change', applyFilters);
+    statusFilter.addEventListener('change', applyFilters);
+    
+    // Modal functionality
+    const detailsModal = document.getElementById('details-modal');
+    const modalBackdrop = document.querySelector('.modal-backdrop');
+    const closeModal = document.getElementById('close-modal');
+    const detailsContent = document.getElementById('details-content');
+    const resourceId = document.getElementById('resource-id');
+    
+    document.querySelectorAll('.view-details').forEach(button => {
+        button.addEventListener('click', function() {
+            const details = JSON.parse(this.getAttribute('data-details'));
+            const resource = this.getAttribute('data-resource');
+            
+            resourceId.textContent = resource;
+            detailsContent.textContent = JSON.stringify(details, null, 2);
+            
+            detailsModal.classList.remove('hidden');
+        });
+    });
+    
+    function hideModal() {
+        detailsModal.classList.add('hidden');
+    }
+    
+    closeModal.addEventListener('click', hideModal);
+    modalBackdrop.addEventListener('click', hideModal);
+});
+</script>
+{% endblock %} 
